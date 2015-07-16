@@ -1,9 +1,9 @@
 
 
 (.*)\.c => obj/\1.o obj/\1.d
-  g++ -c -o $@ $^ -MMD
+  g++ -c -o $@ $^ -MMD -std=c++14
 (.*)\.cpp => obj/\1.o obj/\1.d
-  g++ -c -o $@ $^ -MMD
+  g++ -c -o $@ $^ -MMD -std=c++14
 
 obj/src/.*\.o => bin/zelda
   g++ -o $@ $^
