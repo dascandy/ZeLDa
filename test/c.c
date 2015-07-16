@@ -1,6 +1,6 @@
 #include "hello.h"
 
-extern void puts(const char*);
+extern "C" void puts(const char*);
 
 void helloworld()
 {

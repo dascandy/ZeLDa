@@ -1,6 +1,8 @@
 #ifndef ELF_H
 #define ELF_H
 
+#include <stdint.h>
+
 typedef uint32_t Elf32_Addr;
 typedef uint32_t Elf32_Off;
 typedef uint32_t Elf32_Word;

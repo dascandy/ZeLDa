@@ -1,6 +1,6 @@
 
 
-void puts(const char*)
+extern "C" void puts(const char*)
 {
 
 }
