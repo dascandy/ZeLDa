@@ -1,0 +1,8 @@
+
+
+void puts(const char*)
+{
+
+}
+
+

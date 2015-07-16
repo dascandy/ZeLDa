@@ -1,12 +1,17 @@
 
 
-src/(.*)\.cpp => obj/\1.o obj/\1.d
+(.*)\.c => obj/\1.o obj/\1.d
+  g++ -c -o $@ $^ -MMD
+(.*)\.cpp => obj/\1.o obj/\1.d
   g++ -c -o $@ $^ -MMD
 
-obj/.*\.o => bin/zelda
+obj/src/.*\.o => bin/zelda
   g++ -o $@ $^
 
-bin/zelda => all
+obj/test/.*\.o [bin/zelda] => bin/test/hello.elf
+  bin/zelda -o $@ $^
+
+bin/test/hello.elf => all
 
 depfiles obj/.*\.d
 generated obj/.*
