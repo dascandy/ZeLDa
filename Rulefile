@@ -1,0 +1,13 @@
+
+
+src/(.*)\.cpp => obj/\1.o obj/\1.d
+  g++ -c -o $@ $^ -MMD
+
+obj/.*\.o => bin/zelda
+  g++ -o $@ $^
+
+bin/zelda => all
+
+depfiles obj/.*\.d
+generated obj/.*
+
