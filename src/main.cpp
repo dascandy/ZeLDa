@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "elf.h"
+#include <unordered_map>
 
 int main(int argc, char **argv) 
 {
@@ -20,18 +21,18 @@ int main(int argc, char **argv)
     }
     arg++;
   }
+  std::unordered_map<std::string, std::pair<ElfFile*, Elf32_Sym*> > symbols;
   printf("output %s\n", outputName.c_str());
   for (auto e : inputs) {
-    static size_t index = 0;
-    printf("input %zu %zu secs\n", index++, e->sectioncount());
-    for (size_t n = 1; n < e->sectioncount(); n++) {
-      Elf32_Shdr* sectionhdr = e->section(n);
-      printf("section %s offset %8X size %8X\n", e->name(sectionhdr->name), sectionhdr->offset, sectionhdr->size);
-    }
     for (size_t n = 1; n < e->symbolcount(); n++) {
       Elf32_Sym* sym = e->symbol(n);
-      printf("symbol %s offset %8X section %d\n", sym->name ? e->symbolname(sym->name) : "<none>", sym->value, sym->shndx);
+      if (sym->type() == STT_FUNC ||
+          sym->type() == STT_OBJECT)
+        symbols[e->symbolname(sym->name)] = std::make_pair(e, sym);
     }
+  }
+  for (auto& sym : symbols) {
+    printf("Found symbol %s\n", sym.first.c_str());
   }
 }
 

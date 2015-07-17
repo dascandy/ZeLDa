@@ -48,6 +48,8 @@ struct Elf32_Sym {
   uint8_t       info;
   uint8_t       other;
   Elf32_Half    shndx;
+  uint8_t       bind() { return info >> 4; }
+  uint8_t       type() { return info & 0xF; }
 };
 
 struct Elf32_Rel {
