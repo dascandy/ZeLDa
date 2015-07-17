@@ -2,10 +2,8 @@
 
 src/(.*)\.cpp => obj/src/\1.o obj/src/\1.d
   g++ -c -o $@ $^ -MMD -std=c++14
-(.*)\.c => obj/\1.o obj/\1.d
-  g++ -c -o $@ $^ -MMD -std=c++14 -m32
-(.*)\.cpp => obj/\1.o obj/\1.d
-  g++ -c -o $@ $^ -MMD -std=c++14 -m32
+(.*)\.(?:c|cpp) => obj/\1.o obj/\1.d
+  g++ -c -o $@ $^ -MMD -std=c++14 -m32 -ffunction-sections -fdata-sections
 
 obj/src/.*\.o => bin/zelda
   g++ -o $@ $^
