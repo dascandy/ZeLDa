@@ -55,12 +55,16 @@ struct Elf32_Sym {
 struct Elf32_Rel {
   Elf32_Addr    offset;
   Elf32_Word    info;
+  uint32_t      sym() { return info >> 8; }
+  uint8_t       type() { return info & 0xFF; }
 };
 
 struct Elf32_RelA {
   Elf32_Addr    offset;
   Elf32_Word    info;
   Elf32_Sword   addend;
+  uint32_t      sym() { return info >> 8; }
+  uint8_t       type() { return info & 0xFF; }
 };
 
 struct Elf32_Phdr {
@@ -110,6 +114,12 @@ enum {
   STT_FUNC = 2,
   STT_SECTION = 3,
   STT_FILE = 4,
+};
+
+enum {
+  SHN_UNDEF = 0,
+  SHN_ABS = 0xfff1,
+  SHN_COMMON = 0xfff2,
 };
 
 enum {
