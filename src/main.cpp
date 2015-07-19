@@ -106,6 +106,9 @@ int main(int argc, char **argv)
       }
     }
   }
+  for (auto& r : sectionsToInclude) {
+    printf("including section %s from file %p\n", r.first.second.c_str(), r.first.first);
+  }
 }
 
 
