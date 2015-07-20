@@ -123,7 +123,7 @@ Elf32_Ehdr* ElfExecutable::header() {
 }
 
 uint8_t *ElfExecutable::get(Elf32_Phdr* phdr) {
-  printf("phdr->offset %p\n", phdr->offset);
+  printf("phdr->offset %08X\n", phdr->offset);
   return storage.data() + phdr->offset;
 }
 
