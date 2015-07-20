@@ -4,6 +4,7 @@
 #include <string>
 #include <stdint.h>
 #include <stddef.h>
+#include <vector>
 
 struct Elf32_Ehdr;
 struct Elf32_Shdr;
@@ -30,6 +31,19 @@ public:
   Elf32_Sym* symbol(const std::string& name);
   const char* name(size_t offset);
   const char* symbolname(size_t offset);
+};
+
+class ElfExecutable {
+public:
+  ElfExecutable(const std::string& name);
+  ~ElfExecutable();
+  Elf32_Ehdr* header();
+  Elf32_Phdr* add_phdr(size_t size, uint32_t vaddr, bool isBss);
+  uint8_t *get(Elf32_Phdr*);
+private:
+  std::vector<uint8_t> storage;
+  std::vector<Elf32_Phdr> phdrs;
+  std::string name;
 };
 
 #endif
