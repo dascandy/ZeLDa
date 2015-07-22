@@ -39,23 +39,31 @@ int main(int argc, char **argv)
     } else if (*arg == std::string("-E")) {
       arg++;
       entryPoint = *arg;
+    } else if ((*arg)[strlen(*arg)-1] == 'a') {
+      std::shared_ptr<MmapFile> mapfile = std::make_shared<MmapFile>(*arg);
+      ArFile f(mapfile);
+      // TODO: parse entries
+      for (auto&& entry : f) {
+        printf("entry %s: %zu %zu\n", std::get<0>(entry).c_str(), std::get<1>(entry), std::get<2>(entry));
+        if (std::get<0>(entry).back() == 'o') { // not quite secure or anything
+          inputs.push_back(new ElfFile(mapfile, std::get<1>(entry), std::get<2>(entry)));
+        }
+      }
     } else {
-      inputs.push_back(new ElfFile(*arg));
+      std::shared_ptr<MmapFile> mapfile = std::make_shared<MmapFile>(*arg);
+      inputs.push_back(new ElfFile(mapfile, 0, mapfile->length));
     }
     arg++;
   }
   std::unordered_map<std::string, std::pair<ElfFile*, Elf32_Sym*> > symbols;
-  printf("output %s\n", outputName.c_str());
   for (auto e : inputs) {
     for (size_t n = 1; n < e->symbolcount(); n++) {
       Elf32_Sym* sym = e->symbol(n);
       if (sym->type() == STT_FUNC ||
           sym->type() == STT_OBJECT)
-        symbols[e->symbolname(sym->name)] = std::make_pair(e, sym);
+        if (symbols.find(e->symbolname(sym->name)) == symbols.end())
+          symbols[e->symbolname(sym->name)] = std::make_pair(e, sym);
     }
-  }
-  for (const auto& p : symbols) {
-    printf("|%s|\n", p.first.c_str());
   }
   std::stack<std::pair<ElfFile*, Elf32_Sym*>> undef_symbols;
   if (symbols.find(entryPoint) == symbols.end()) {
@@ -86,16 +94,12 @@ int main(int argc, char **argv)
       if (rels) {
         Elf32_Rel* rs = (Elf32_Rel*)s.first->get(rels);
         size_t rc = rels->size / sizeof(Elf32_Rel);
-        printf("%p %s %zu\n", rels, s.first->name(rels->name), rc);
         for (size_t n = 0; n < rc; n++) {
           Elf32_Rel& r = rs[n];
-          printf("relocation %d\n", r.type());
           Elf32_Sym* sym = s.first->symbol(r.sym());
           if (sym->shndx != SHN_UNDEF) {
-            printf("found defined relocation\n");
             undef_symbols.push(std::make_pair(s.first, sym));
           } else {
-            printf("found undefined symbol ref to %s\n", s.first->symbolname(sym->name));
             if (symbols.find(s.first->symbolname(sym->name)) == symbols.end()) {
               printf("Cannot find definition of %s\n", s.first->symbolname(sym->name));
             } else {
@@ -109,16 +113,12 @@ int main(int argc, char **argv)
       if (relas) {
         Elf32_RelA* rs = (Elf32_RelA*)s.first->get(relas);
         size_t rc = relas->size / sizeof(Elf32_RelA);
-        printf("%p %s %zu\n", relas, s.first->name(relas->name), rc);
         for (size_t n = 0; n < rc; n++) {
           Elf32_RelA& r = rs[n];
-          printf("relocation %d\n", r.type());
           Elf32_Sym* sym = s.first->symbol(r.sym());
           if (sym->shndx != SHN_UNDEF) {
-            printf("found defined relocation\n");
             undef_symbols.push(std::make_pair(s.first, sym));
           } else {
-            printf("found undefined symbol ref to %s\n", s.first->symbolname(sym->name));
             if (symbols.find(s.first->symbolname(sym->name)) == symbols.end()) {
               printf("Cannot find definition of %s\n", s.first->symbolname(sym->name));
             } else {
@@ -182,7 +182,6 @@ int main(int argc, char **argv)
             size_t relocaddr = phdr->vaddr + offset + r.offset;
             addr -= relocaddr;
           }
-          printf("relocation %08X to become %08X\n", offset + r.offset, addr);
           *(uint32_t*)(exe.get(phdr) + offset + r.offset) += addr;
         }
       }
@@ -201,7 +200,6 @@ int main(int argc, char **argv)
             auto& refsym = symbols[file->symbolname(sym->name)];
             addr = addresses[refsym.first->section(refsym.second->shndx)] + refsym.second->value;
           }
-          printf("relocation %08X to become %08X\n", offset + r.offset, addr);
           *(uint32_t*)(exe.get(phdr) + offset + r.offset) += addr;
         }
       }
