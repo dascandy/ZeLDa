@@ -127,7 +127,7 @@ Elf32_Shdr* ElfFile::section(const std::string& name) {
 
 size_t ElfFile::symbolcount() {
   Elf32_Shdr *symtab = section(".symtab");
-  return symtab->size / sizeof(Elf32_Sym);
+  return symtab ? symtab->size / sizeof(Elf32_Sym) : 0;
 }
 
 Elf32_Sym* ElfFile::symbol(size_t index) {

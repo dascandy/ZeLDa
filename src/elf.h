@@ -8,6 +8,85 @@ typedef uint32_t Elf32_Off;
 typedef uint32_t Elf32_Word;
 typedef int32_t Elf32_Sword;
 typedef uint16_t Elf32_Half;
+typedef uint64_t Elf32_Xword;
+typedef int64_t Elf32_Sxword;
+
+typedef uint64_t Elf64_Addr;
+typedef uint64_t Elf64_Off;
+typedef uint32_t Elf64_Word;
+typedef int32_t Elf64_Sword;
+typedef uint16_t Elf64_Half;
+typedef uint64_t Elf64_Xword;
+typedef int64_t Elf64_Sxword;
+
+struct Elf64_Ehdr {
+  uint32_t       ident;
+  uint8_t        filclass, data_encoding, file_version;
+  uint8_t        pad[9];
+  Elf64_Half     type;
+  Elf64_Half     machine;
+  Elf64_Word     version;
+  Elf64_Addr     entry;
+  Elf64_Off      phoff;
+  Elf64_Off      shoff;
+  Elf64_Word     flags;
+  Elf64_Half     ehsize;
+  Elf64_Half     phentsize;
+  Elf64_Half     phnum;
+  Elf64_Half     shentsize;
+  Elf64_Half     shnum;
+  Elf64_Half     shstrndx;
+};
+
+struct Elf64_Shdr {
+  Elf64_Word   name;
+  Elf64_Word   type;
+  Elf64_XWord  flags;
+  Elf64_Addr   addr;
+  Elf64_Off    offset;
+  Elf64_XWord  size;
+  Elf64_Word   link;
+  Elf64_Word   info;
+  Elf64_XWord  addralign;
+  Elf64_XWord  entsize;
+};
+
+struct Elf64_Sym {
+  Elf64_Word    name;
+  uint8_t       info;
+  uint8_t       other;
+  Elf64_Half    shndx;
+  Elf64_Addr    value;
+  Elf64_Xword   size;
+  uint8_t       bind() { return info >> 4; }
+  uint8_t       type() { return info & 0xF; }
+};
+
+struct Elf64_Rel {
+  Elf64_Addr    offset;
+  Elf64_Xword   info;
+  uint32_t      sym() { return info >> 8; }
+  uint8_t       type() { return info & 0xFF; }
+};
+
+struct Elf64_RelA {
+  Elf64_Addr    offset;
+  Elf64_Xword   info;
+  Elf64_Sxword  addend;
+  uint32_t      sym() { return info >> 8; }
+  uint8_t       type() { return info & 0xFF; }
+};
+
+struct Elf64_Phdr {
+  Elf64_Word    type;
+  Elf64_Off     offset;
+  Elf64_Addr    vaddr;
+  Elf64_Addr    paddr;
+  Elf64_Word    filesz;
+  Elf64_Word    memsz;
+  Elf64_Word    flags;
+  Elf64_Word    align;
+};
 
 struct Elf32_Ehdr {
   uint32_t       ident;

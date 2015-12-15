@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 {
   std::string outputName = "a.out";
   std::vector<ElfFile*> inputs;
-  std::string entryPoint = "main";
+  std::string entryPoint = "_start";
 
   char **arg = argv+1;
   while (*arg) {
@@ -46,6 +46,7 @@ int main(int argc, char **argv)
       for (auto&& entry : f) {
         printf("entry %s: %zu %zu\n", std::get<0>(entry).c_str(), std::get<1>(entry), std::get<2>(entry));
         if (std::get<0>(entry).back() == 'o') { // not quite secure or anything
+          printf("added\n");
           inputs.push_back(new ElfFile(mapfile, std::get<1>(entry), std::get<2>(entry)));
         }
       }
@@ -57,8 +58,11 @@ int main(int argc, char **argv)
   }
   std::unordered_map<std::string, std::pair<ElfFile*, Elf32_Sym*> > symbols;
   for (auto e : inputs) {
+    Elf32_Ehdr* eh = e->header();
+    printf("%08X symc = %zu\n", eh->ident, e->symbolcount());
     for (size_t n = 1; n < e->symbolcount(); n++) {
       Elf32_Sym* sym = e->symbol(n);
+      printf("sym %s %p\n", e->symbolname(sym->name), sym);
       if (sym->type() == STT_FUNC ||
           sym->type() == STT_OBJECT)
         if (symbols.find(e->symbolname(sym->name)) == symbols.end())
@@ -206,10 +210,6 @@ int main(int argc, char **argv)
       offset += r->size;
     }
   }
-  /*
-  R_386_32 = 1,
-  R_386_PC32 = 2,
-*/
 }
 
 

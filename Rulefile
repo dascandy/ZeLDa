@@ -8,7 +8,7 @@ src/(.*)\.cpp => obj/src/\1.o obj/src/\1.d
 obj/src/.*\.o => bin/zelda
   g++ -o $@ $^ -g
 
-obj/test/.*\.o [bin/zelda] => bin/test/hello.elf
+obj/test/.*\.o /usr/lib/x86_64-linux-gnu/crt1.o /usr/lib/x86_64-linux-gnu/libc.a [bin/zelda] => bin/test/hello.elf
   bin/zelda -o $@ $^
 
 bin/test/hello.elf => all
