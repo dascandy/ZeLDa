@@ -60,8 +60,8 @@ int main(int argc, char **argv)
     printf("Cannot find definition of entry point %s\n", entryPoint.c_str());
     exit(-1);
   }
-/*
-  std::stack<std::pair<ElfFile*, Elf32_Sym*>> undef_symbols;
+
+  std::stack<Symbol*> undef_symbols;
   undef_symbols.push(symbols[entryPoint]);
   std::map<std::pair<ElfFile*, std::string>, Elf32_Shdr*> sectionsToInclude;
   std::map<Elf32_Shdr*, ElfFile*> owningFile;
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
       sec = sc;
       outputs[sec.getOutputForSection()].push_back(sec);
       owningFile[sec] = s.first;
-      
+      /*
       // add all relocations required for these sections
       // add all new symbols from section to known set
       Elf32_Shdr* rels = s.first->section(std::string(".rel") + s.first->name(sc->name));
@@ -119,9 +119,10 @@ int main(int argc, char **argv)
           }
         }
       }
+*/
     }
   }
-
+/*
   std::map<Elf32_Shdr*, uint32_t> addresses;
   std::map<OutputClass, Elf32_Phdr*> phdrs;
   ElfExecutable exe(outputName);
