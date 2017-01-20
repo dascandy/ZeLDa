@@ -1,6 +1,2 @@
-
-
-.bob.cache
-bin/
-obj/
+build
 

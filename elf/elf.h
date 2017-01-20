@@ -19,6 +19,95 @@ typedef uint16_t Elf64_Half;
 typedef uint64_t Elf64_Xword;
 typedef int64_t Elf64_Sxword;
 
+enum class OutputClass {
+  OUTPUT_CODE,
+  OUTPUT_RODATA,
+  OUTPUT_DATA,
+  OUTPUT_BSS
+};
+
+enum {
+  ET_NONE = 0,
+  ET_REL = 1,
+  ET_EXEC = 2,
+  ET_DYN = 3,
+  ET_CORE = 4,
+  ET_LOPROC = 0xff00,
+  ET_HIPROC = 0xffff,
+};
+
+enum {
+  SHT_NULL = 0,
+  SHT_PROGBITS = 1,
+  SHT_SYMTAB = 2,
+  SHT_STRTAB = 3,
+  SHT_RELA = 4,
+  SHT_HASH = 5,
+  SHT_DYNAMIC = 6,
+  SHT_NOTE = 7,
+  SHT_NOBITS = 8,
+  SHT_REL = 9,
+  SHT_SHLIB = 10,
+  SHT_DYNSYM = 11,
+};
+
+enum {
+  SHF_WRITE = 0x1,
+  SHF_ALLOC = 0x2,
+  SHF_EXECINSTR = 0x4,
+};
+
+enum {
+  STT_OBJECT = 1,
+  STT_FUNC = 2,
+  STT_SECTION = 3,
+  STT_FILE = 4,
+};
+
+enum {
+  SHN_UNDEF = 0,
+  SHN_ABS = 0xfff1,
+  SHN_COMMON = 0xfff2,
+};
+
+enum {
+  EM_NONE = 0,
+  EM_386 = 3,
+};
+
+enum {
+  EV_NONE = 0,
+  EV_CURRENT = 1,
+};
+
+enum {
+  ELFDATA2LSB = 1,
+  ELFDATA2MSB = 2,
+};
+
+enum {
+  PT_NULL = 0,
+  PT_LOAD = 1,
+  PT_DYNAMIC = 2,
+  PT_INTERP = 3,
+  PT_NOTE = 4,
+  PT_SHLIB = 5,
+  PT_PHDR = 6,
+};
+
+enum {
+  R_386_NONE = 0,
+  R_386_32 = 1,
+  R_386_PC32 = 2,
+};
+
+
+struct ElfHeader {
+  uint32_t       ident;
+  uint8_t        filclass, data_encoding, file_version;
+  uint8_t        pad[9];
+};
+
 struct Elf64_Ehdr {
   uint32_t       ident;
   uint8_t        filclass, data_encoding, file_version;
@@ -41,14 +130,23 @@ struct Elf64_Ehdr {
 struct Elf64_Shdr {
   Elf64_Word   name;
   Elf64_Word   type;
-  Elf64_XWord  flags;
+  Elf64_Xword  flags;
   Elf64_Addr   addr;
   Elf64_Off    offset;
-  Elf64_XWord  size;
+  Elf64_Xword  size;
   Elf64_Word   link;
   Elf64_Word   info;
-  Elf64_XWord  addralign;
-  Elf64_XWord  entsize;
+  Elf64_Xword  addralign;
+  Elf64_Xword  entsize;
+  OutputClass getOutputForSection() {
+    if (flags & SHF_EXECINSTR)
+      return OutputClass::OUTPUT_CODE;
+    if (type == SHT_NOBITS)
+      return OutputClass::OUTPUT_BSS;
+    if ((flags & SHF_WRITE) == 0)
+      return OutputClass::OUTPUT_RODATA;
+    return OutputClass::OUTPUT_DATA;
+  }
 };
 
 struct Elf64_Sym {
@@ -118,6 +216,15 @@ struct Elf32_Shdr {
   Elf32_Word   info;
   Elf32_Word   addralign;
   Elf32_Word   entsize;
+  OutputClass getOutputForSection() {
+    if (flags & SHF_EXECINSTR)
+      return OutputClass::OUTPUT_CODE;
+    if (type == SHT_NOBITS)
+      return OutputClass::OUTPUT_BSS;
+    if ((flags & SHF_WRITE) == 0)
+      return OutputClass::OUTPUT_RODATA;
+    return OutputClass::OUTPUT_DATA;
+  }
 };
 
 struct Elf32_Sym {
@@ -158,83 +265,28 @@ struct Elf32_Phdr {
 };
 
 enum {
-  ET_NONE = 0,
-  ET_REL = 1,
-  ET_EXEC = 2,
-  ET_DYN = 3,
-  ET_CORE = 4,
-  ET_LOPROC = 0xff00,
-  ET_HIPROC = 0xffff,
-};
-
-enum {
-  SHT_NULL = 0,
-  SHT_PROGBITS = 1,
-  SHT_SYMTAB = 2,
-  SHT_STRTAB = 3,
-  SHT_RELA = 4,
-  SHT_HASH = 5,
-  SHT_DYNAMIC = 6,
-  SHT_NOTE = 7,
-  SHT_NOBITS = 8,
-  SHT_REL = 9,
-  SHT_SHLIB = 10,
-  SHT_DYNSYM = 11,
-};
-
-enum {
-  SHF_WRITE = 0x1,
-  SHF_ALLOC = 0x2,
-  SHF_EXECINSTR = 0x4,
-};
-
-enum {
-  STT_OBJECT = 1,
-  STT_FUNC = 2,
-  STT_SECTION = 3,
-  STT_FILE = 4,
-};
-
-enum {
-  SHN_UNDEF = 0,
-  SHN_ABS = 0xfff1,
-  SHN_COMMON = 0xfff2,
-};
-
-enum {
-  EM_NONE = 0,
-  EM_386 = 3,
-};
-
-enum {
-  EV_NONE = 0,
-  EV_CURRENT = 1,
-};
-
-enum {
   ELFCLASS32 = 1,
   ELFCLASS64 = 2,
 };
 
-enum {
-  ELFDATA2LSB = 1,
-  ELFDATA2MSB = 2,
+struct Elf32 {
+  typedef Elf32_Ehdr ElfHeader;
+  typedef Elf32_Shdr SectionHeader;
+  typedef Elf32_Phdr ProgramHeader;
+  typedef Elf32_Sym Symbol;
+  typedef Elf32_Rel Relocation;
+  typedef Elf32_RelA RelocationA;
+  enum { Class = ELFCLASS32 };
 };
 
-enum {
-  PT_NULL = 0,
-  PT_LOAD = 1,
-  PT_DYNAMIC = 2,
-  PT_INTERP = 3,
-  PT_NOTE = 4,
-  PT_SHLIB = 5,
-  PT_PHDR = 6,
-};
-
-enum {
-  R_386_NONE = 0,
-  R_386_32 = 1,
-  R_386_PC32 = 2,
+struct Elf64 {
+  typedef Elf64_Ehdr ElfHeader;
+  typedef Elf64_Shdr SectionHeader;
+  typedef Elf64_Phdr ProgramHeader;
+  typedef Elf64_Sym Symbol;
+  typedef Elf64_Rel Relocation;
+  typedef Elf64_RelA RelocationA;
+  enum { Class = ELFCLASS64 };
 };
 
 #endif

@@ -1,4 +1,6 @@
 #include "ElfFile.h"
+#include "ArFile.h"
+#include "MmapFile.h"
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -8,27 +10,10 @@
 #include <map>
 #include <string.h>
 
-enum class OutputClass {
-  OUTPUT_CODE,
-  OUTPUT_RODATA,
-  OUTPUT_DATA,
-  OUTPUT_BSS
-};
-
-OutputClass getOutputForSection(Elf32_Shdr* section) {
-  if (section->flags & SHF_EXECINSTR)
-    return OutputClass::OUTPUT_CODE;
-  if (section->type == SHT_NOBITS)
-    return OutputClass::OUTPUT_BSS;
-  if ((section->flags & SHF_WRITE) == 0)
-    return OutputClass::OUTPUT_RODATA;
-  return OutputClass::OUTPUT_DATA;
-}
-
 int main(int argc, char **argv) 
 {
   std::string outputName = "a.out";
-  std::vector<ElfFile*> inputs;
+  std::vector<ObjectFile*> inputs;
   std::string entryPoint = "_start";
 
   char **arg = argv+1;
@@ -43,37 +28,40 @@ int main(int argc, char **argv)
       std::shared_ptr<MmapFile> mapfile = std::make_shared<MmapFile>(*arg);
       ArFile f(mapfile);
       // TODO: parse entries
-      for (auto&& entry : f) {
+      for (const auto& entry : f) {
         printf("entry %s: %zu %zu\n", std::get<0>(entry).c_str(), std::get<1>(entry), std::get<2>(entry));
-        if (std::get<0>(entry).back() == 'o') { // not quite secure or anything
+        if (std::get<0>(entry).back() == 'o') {
           printf("added\n");
-          inputs.push_back(new ElfFile(mapfile, std::get<1>(entry), std::get<2>(entry)));
+          inputs.push_back(LoadElfFile(mapfile, std::get<1>(entry), std::get<2>(entry)));
         }
       }
     } else {
       std::shared_ptr<MmapFile> mapfile = std::make_shared<MmapFile>(*arg);
-      inputs.push_back(new ElfFile(mapfile, 0, mapfile->length));
+      inputs.push_back(LoadElfFile(mapfile, 0, mapfile->length));
     }
     arg++;
   }
-  std::unordered_map<std::string, std::pair<ElfFile*, Elf32_Sym*> > symbols;
+
+  std::unordered_map<std::string, Symbol*> symbols;
   for (auto e : inputs) {
-    Elf32_Ehdr* eh = e->header();
-    printf("%08X symc = %zu\n", eh->ident, e->symbolcount());
+    printf("symc = %zu\n", e->symbolcount());
     for (size_t n = 1; n < e->symbolcount(); n++) {
-      Elf32_Sym* sym = e->symbol(n);
-      printf("sym %s %p\n", e->symbolname(sym->name), sym);
-      if (sym->type() == STT_FUNC ||
-          sym->type() == STT_OBJECT)
-        if (symbols.find(e->symbolname(sym->name)) == symbols.end())
-          symbols[e->symbolname(sym->name)] = std::make_pair(e, sym);
+      Symbol* sym = e->getSymbol(n);
+      auto name = sym->name();
+      if (name.size() > 0) {
+        printf("sym %s\n", sym->name().c_str());
+        if (symbols.find(sym->name()) == symbols.end())
+          symbols[sym->name()] = sym;
+      }
     }
   }
-  std::stack<std::pair<ElfFile*, Elf32_Sym*>> undef_symbols;
+
   if (symbols.find(entryPoint) == symbols.end()) {
     printf("Cannot find definition of entry point %s\n", entryPoint.c_str());
     exit(-1);
   }
+/*
+  std::stack<std::pair<ElfFile*, Elf32_Sym*>> undef_symbols;
   undef_symbols.push(symbols[entryPoint]);
   std::map<std::pair<ElfFile*, std::string>, Elf32_Shdr*> sectionsToInclude;
   std::map<Elf32_Shdr*, ElfFile*> owningFile;
@@ -89,7 +77,7 @@ int main(int argc, char **argv)
     if (!sec) {
       // add its section
       sec = sc;
-      outputs[getOutputForSection(sec)].push_back(sec);
+      outputs[sec.getOutputForSection()].push_back(sec);
       owningFile[sec] = s.first;
       
       // add all relocations required for these sections
@@ -210,6 +198,7 @@ int main(int argc, char **argv)
       offset += r->size;
     }
   }
+*/
 }
 
 
