@@ -11,21 +11,40 @@
 class Symbol;
 
 class Section {
-private:
-  virtual size_t size();
-  virtual void Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols);
+public:
+  enum class OutputClass {
+    Code,
+    RoData,
+    Data,
+    Bss
+  };
+  virtual std::string name() = 0;
+  virtual void forEachRelocation(const std::function<void(Symbol*)> &cb) = 0;
+  virtual OutputClass getOutputForSection() = 0;
+  virtual size_t size() = 0;
+  virtual size_t SetAddress(size_t address) = 0;
+  virtual size_t GetAddress() = 0;
+  virtual void Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols) = 0;
 };
 
 class Symbol {
 public:
+  enum class Type {
+    Unknown,
+    Function,
+    Object,
+  };
   virtual Section* section() = 0;
   virtual size_t offset() = 0;
   virtual std::string name() = 0;
+  virtual Type type() = 0;
 };
 
 class ObjectFile {
 public:
   virtual size_t symbolcount() = 0;
+  virtual size_t sectioncount() = 0;
+  virtual Section* getSection(size_t index) = 0;
   virtual Symbol* getSymbol(size_t index) = 0;
   virtual Symbol* getSymbol(const std::string& name) = 0;
 };
@@ -40,20 +59,37 @@ private:
 private:
   std::shared_ptr<MmapFile> file;
   uint8_t *ptr;
+
+  struct ElfSection : Section {
+    ElfSection(typename Elf::SectionHeader*, ElfFile<Elf>*);
+    void forEachRelocation(const std::function<void(Symbol*)> &cb);
+    OutputClass getOutputForSection();
+    size_t size();
+    size_t SetAddress(size_t address) override;
+    size_t GetAddress() override;
+    std::string name() override;
+    void Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols);
+    typename Elf::SectionHeader* sec;
+    ElfFile<Elf>* file;
+  };
+
   struct ElfSymbol : Symbol {
     ElfSymbol(typename Elf::Symbol*, ElfFile<Elf>*);
     Section* section() override;
     size_t offset() override;
     std::string name() override;
+    Type type() override;
     typename Elf::Symbol* sym;
     ElfFile<Elf>* file;
   };
   std::unordered_map<typename Elf::Symbol*, ElfSymbol> symbols;
+  std::unordered_map<typename Elf::SectionHeader*, ElfSection> sections;
 public:
   size_t symbolcount() override;
+  size_t sectioncount() override;
+  Section* getSection(size_t index) override;
   Symbol* getSymbol(size_t index) override;
   Symbol* getSymbol(const std::string& name) override;
-  size_t sectioncount();
   size_t segmentcount();
   typename Elf::ElfHeader* header();
   typename Elf::SectionHeader* section(size_t index);

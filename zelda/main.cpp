@@ -9,6 +9,7 @@
 #include <stack>
 #include <map>
 #include <string.h>
+#include <algorithm>
 
 int main(int argc, char **argv) 
 {
@@ -48,7 +49,8 @@ int main(int argc, char **argv)
     for (size_t n = 1; n < e->symbolcount(); n++) {
       Symbol* sym = e->getSymbol(n);
       auto name = sym->name();
-      if (name.size() > 0) {
+      if (name.size() > 0 && 
+          sym->type() != Symbol::Type::Unknown) {
         printf("sym %s\n", sym->name().c_str());
         if (symbols.find(sym->name()) == symbols.end())
           symbols[sym->name()] = sym;
@@ -61,87 +63,33 @@ int main(int argc, char **argv)
     exit(-1);
   }
 
-  std::stack<Symbol*> undef_symbols;
-  undef_symbols.push(symbols[entryPoint]);
-  std::map<std::pair<ElfFile*, std::string>, Elf32_Shdr*> sectionsToInclude;
-  std::map<Elf32_Shdr*, ElfFile*> owningFile;
-  std::map<OutputClass, std::vector<Elf32_Shdr*> > outputs;
-  while (!undef_symbols.empty()) {
-    // take first symbol
-    std::pair<ElfFile*, Elf32_Sym*> s = undef_symbols.top();
-    undef_symbols.pop();
-    // if its section not already present, 
-    Elf32_Shdr* sc = s.first->section(s.second->shndx);
-    std::pair<ElfFile*, std::string> key = std::make_pair(s.first, s.first->name(sc->name));
-    Elf32_Shdr*& sec = sectionsToInclude[key];
-    if (!sec) {
-      // add its section
-      sec = sc;
-      outputs[sec.getOutputForSection()].push_back(sec);
-      owningFile[sec] = s.first;
-      /*
-      // add all relocations required for these sections
-      // add all new symbols from section to known set
-      Elf32_Shdr* rels = s.first->section(std::string(".rel") + s.first->name(sc->name));
-      if (rels) {
-        Elf32_Rel* rs = (Elf32_Rel*)s.first->get(rels);
-        size_t rc = rels->size / sizeof(Elf32_Rel);
-        for (size_t n = 0; n < rc; n++) {
-          Elf32_Rel& r = rs[n];
-          Elf32_Sym* sym = s.first->symbol(r.sym());
-          if (sym->shndx != SHN_UNDEF) {
-            undef_symbols.push(std::make_pair(s.first, sym));
-          } else {
-            if (symbols.find(s.first->symbolname(sym->name)) == symbols.end()) {
-              printf("Cannot find definition of %s\n", s.first->symbolname(sym->name));
-            } else {
-              undef_symbols.push(symbols[s.first->symbolname(sym->name)]);
-            }
-          }
-        }
+  std::stack<Section*> sectionsToDo;
+  std::vector<Section*> sectionsToInclude;
+  std::map<Section::OutputClass, std::vector<Section*> > outputs;
+  sectionsToDo.push(symbols[entryPoint]->section());
+  while (!sectionsToDo.empty()) {
+    Section* sec = sectionsToDo.top();
+    sectionsToInclude.push_back(sec);
+    outputs[sec->getOutputForSection()].push_back(sec);
+    sec->forEachRelocation([&sectionsToDo, &symbols, &sectionsToInclude](Symbol* sym) {
+      if (sym->type() == Symbol::Type::Unknown) {
+        sym = symbols[sym->name()]; // swap out this undefined reference for the definition
       }
 
-      Elf32_Shdr* relas = s.first->section(std::string(".rela") + s.first->name(sc->name));
-      if (relas) {
-        Elf32_RelA* rs = (Elf32_RelA*)s.first->get(relas);
-        size_t rc = relas->size / sizeof(Elf32_RelA);
-        for (size_t n = 0; n < rc; n++) {
-          Elf32_RelA& r = rs[n];
-          Elf32_Sym* sym = s.first->symbol(r.sym());
-          if (sym->shndx != SHN_UNDEF) {
-            undef_symbols.push(std::make_pair(s.first, sym));
-          } else {
-            if (symbols.find(s.first->symbolname(sym->name)) == symbols.end()) {
-              printf("Cannot find definition of %s\n", s.first->symbolname(sym->name));
-            } else {
-              undef_symbols.push(symbols[s.first->symbolname(sym->name)]);
-            }
-          }
-        }
+      if (std::find(sectionsToInclude.begin(), sectionsToInclude.end(), sym->section()) == sectionsToInclude.end()) {
+        sectionsToDo.push(sym->section());
       }
-*/
+    });
+  }
+  std::map<Section*, uint64_t> addresses;
+  uint64_t addr = 0x8048000;
+  for (auto& outclass : outputs) {
+    for (auto& sec : outclass.second) {
+      addr = sec->SetAddress(addr);
     }
+    addr = ((addr - 1) | 0xFFF) + 1;
   }
 /*
-  std::map<Elf32_Shdr*, uint32_t> addresses;
-  std::map<OutputClass, Elf32_Phdr*> phdrs;
-  ElfExecutable exe(outputName);
-  uint32_t curAddr = 0x8048000;
-  for (auto& p : outputs) {
-    size_t start = curAddr;
-    for (auto& r : p.second) {
-      size_t mask = r->addralign - 1;
-      if (curAddr & mask)
-        curAddr += r->addralign - (curAddr & mask);
-
-      printf("including %d section %p at %08X size %8X\n", p.first, r, curAddr, r->size);
-      addresses[r] = curAddr;
-      curAddr += r->size;
-    }
-    phdrs[p.first] = exe.add_phdr(curAddr - start, start, p.first == OutputClass::OUTPUT_BSS);
-    curAddr = ((curAddr - 1) & 0xFFFFF000) + 0x1000;
-  }
-
   // Second loop so all sections have a known target address (decided in first pass) that we can now relocate to
   auto& entrysym = symbols[entryPoint];
   Elf32_Shdr* entrysec = entrysym.first->section(entrysym.second->shndx);
@@ -199,7 +147,7 @@ int main(int argc, char **argv)
       offset += r->size;
     }
   }
-*/
+  */
 }
 
 

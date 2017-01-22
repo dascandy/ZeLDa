@@ -79,6 +79,16 @@ size_t ElfFile<Elf>::symbolcount() {
 }
 
 template <typename Elf>
+Section* ElfFile<Elf>::getSection(size_t index) {
+  typename Elf::SectionHeader* s = section(index);
+  auto it = sections.find(s);
+  if (it == sections.end()) {
+    sections.insert(std::pair<typename Elf::SectionHeader*, ElfSection>(s, ElfSection(s, this)));
+  }
+  return &sections.find(s)->second;
+}
+
+template <typename Elf>
 Symbol* ElfFile<Elf>::getSymbol(size_t index) {
   typename Elf::Symbol* s = symbol(index);
   auto it = symbols.find(s);
@@ -134,7 +144,88 @@ std::string ElfFile<Elf>::ElfSymbol::name() {
 
 template <typename Elf>
 Section* ElfFile<Elf>::ElfSymbol::section() {
-  return nullptr;
+  return file->getSection(sym->shndx);
+}
+
+template <typename Elf>
+Symbol::Type ElfFile<Elf>::ElfSymbol::type() {
+  if (sym->shndx == SHN_UNDEF) 
+    return Type::Unknown;
+  switch (sym->type()) {
+    default: 
+      return Type::Unknown;
+    case STT_FUNC: 
+      return Type::Function;
+    case STT_OBJECT: 
+      return Type::Object;
+  }
+}
+
+template <typename Elf>
+ElfFile<Elf>::ElfSection::ElfSection(typename Elf::SectionHeader* sec, ElfFile<Elf>* file) 
+: sec(sec)
+, file(file)
+{
+}
+
+template <typename Elf, typename Relocation>
+static void forEachRelocationDo(ElfFile<Elf>* file, typename Elf::SectionHeader* rels, const std::function<void(Symbol*)> &cb) {
+  Relocation* relCurrent = reinterpret_cast<Relocation*>(file->get(rels));
+  Relocation* relEnd = relCurrent + rels->size / sizeof(Relocation);
+  for (; relCurrent != relEnd; ++relCurrent) {
+    cb(file->getSymbol(relCurrent->sym()));
+  }
+}
+
+template <typename Elf>
+void ElfFile<Elf>::ElfSection::forEachRelocation(const std::function<void(Symbol*)> &cb) {
+  typename Elf::SectionHeader* rels = file->section(".rel" + name());
+  if (rels) {
+    forEachRelocationDo<Elf, typename Elf::Relocation>(file, rels, cb);
+  }
+  typename Elf::SectionHeader* relas = file->section(".rela" + name());
+  if (relas) {
+    forEachRelocationDo<Elf, typename Elf::RelocationA>(file, relas, cb);
+  }
+}
+
+template <typename Elf>
+std::string ElfFile<Elf>::ElfSection::name() {
+  return file->name(sec->name);
+}
+
+template <typename Elf>
+size_t ElfFile<Elf>::ElfSection::SetAddress(size_t address) {
+  size_t mask = sec->addralign - 1;
+  if (address & mask) address += sec->addralign - (address & mask);
+  sec->addr = address;
+  return sec->addr + sec->size;
+}
+
+template <typename Elf>
+size_t ElfFile<Elf>::ElfSection::GetAddress() {
+  return sec->addr;
+}
+
+template <typename Elf>
+Section::OutputClass ElfFile<Elf>::ElfSection::getOutputForSection() {
+  if (sec->flags & SHF_EXECINSTR)
+    return OutputClass::Code;
+  if (sec->type == SHT_NOBITS)
+    return OutputClass::Bss;
+  if ((sec->flags & SHF_WRITE) == 0)
+    return OutputClass::RoData;
+  return OutputClass::Data;
+}
+
+template <typename Elf>
+size_t ElfFile<Elf>::ElfSection::size() {
+  return sec->size;
+}
+
+template <typename Elf>
+void ElfFile<Elf>::ElfSection::Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols) {
+  TODO:;
 }
 
 /*

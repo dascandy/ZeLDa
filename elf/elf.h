@@ -19,13 +19,6 @@ typedef uint16_t Elf64_Half;
 typedef uint64_t Elf64_Xword;
 typedef int64_t Elf64_Sxword;
 
-enum class OutputClass {
-  OUTPUT_CODE,
-  OUTPUT_RODATA,
-  OUTPUT_DATA,
-  OUTPUT_BSS
-};
-
 enum {
   ET_NONE = 0,
   ET_REL = 1,
@@ -58,6 +51,7 @@ enum {
 };
 
 enum {
+  STT_NONE = 0,
   STT_OBJECT = 1,
   STT_FUNC = 2,
   STT_SECTION = 3,
@@ -138,15 +132,6 @@ struct Elf64_Shdr {
   Elf64_Word   info;
   Elf64_Xword  addralign;
   Elf64_Xword  entsize;
-  OutputClass getOutputForSection() {
-    if (flags & SHF_EXECINSTR)
-      return OutputClass::OUTPUT_CODE;
-    if (type == SHT_NOBITS)
-      return OutputClass::OUTPUT_BSS;
-    if ((flags & SHF_WRITE) == 0)
-      return OutputClass::OUTPUT_RODATA;
-    return OutputClass::OUTPUT_DATA;
-  }
 };
 
 struct Elf64_Sym {
@@ -216,15 +201,6 @@ struct Elf32_Shdr {
   Elf32_Word   info;
   Elf32_Word   addralign;
   Elf32_Word   entsize;
-  OutputClass getOutputForSection() {
-    if (flags & SHF_EXECINSTR)
-      return OutputClass::OUTPUT_CODE;
-    if (type == SHT_NOBITS)
-      return OutputClass::OUTPUT_BSS;
-    if ((flags & SHF_WRITE) == 0)
-      return OutputClass::OUTPUT_RODATA;
-    return OutputClass::OUTPUT_DATA;
-  }
 };
 
 struct Elf32_Sym {
