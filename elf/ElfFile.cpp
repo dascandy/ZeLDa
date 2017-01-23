@@ -224,7 +224,7 @@ size_t ElfFile<Elf>::ElfSection::size() {
 }
 
 template <typename Elf>
-void ElfFile<Elf>::ElfSection::Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols) {
+void ElfFile<Elf>::ElfSection::Write(uint8_t* target, const std::unordered_map<Section*, size_t> &sections) {
   TODO:;
 }
 

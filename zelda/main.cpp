@@ -81,13 +81,28 @@ int main(int argc, char **argv)
       }
     });
   }
-  std::map<Section*, uint64_t> addresses;
+  std::unordered_map<Section*, uint64_t> addresses;
+  std::unordered_map<Section::OutputClass, std::pair<uint64_t, uint64_t>> sizes;
   uint64_t addr = 0x8048000;
   for (auto& outclass : outputs) {
+    uint64_t start = addr;
     for (auto& sec : outclass.second) {
       addr = sec->SetAddress(addr);
     }
+    sizes[outclass.first] = std::make_pair(start, addr - start);
     addr = ((addr - 1) | 0xFFF) + 1;
+  }
+  for (auto& outclass : outputs) {
+    if (outclass.first == Section::OutputClass::Bss) {
+      // exe.addSegment(x, nullptr, sizes[outclass.first]);
+    } else {
+      std::vector<uint8_t> storage;
+      storage.resize(sizes[outclass.first].second);
+      for (auto& sec : outclass.second) {
+        sec->Write(storage.data() + sec->GetAddress() - sizes[outclass.first].first, addresses);
+      }
+      // exe.addSegment(x, storage.data(), storage.size());
+    }
   }
 /*
   // Second loop so all sections have a known target address (decided in first pass) that we can now relocate to

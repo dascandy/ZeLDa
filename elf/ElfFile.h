@@ -24,7 +24,7 @@ public:
   virtual size_t size() = 0;
   virtual size_t SetAddress(size_t address) = 0;
   virtual size_t GetAddress() = 0;
-  virtual void Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols) = 0;
+  virtual void Write(uint8_t* target, const std::unordered_map<Section*, size_t> &symbols) = 0;
 };
 
 class Symbol {
@@ -68,7 +68,7 @@ private:
     size_t SetAddress(size_t address) override;
     size_t GetAddress() override;
     std::string name() override;
-    void Write(uint8_t* target, std::unordered_map<Symbol*, size_t> symbols);
+    void Write(uint8_t* target, const std::unordered_map<Section*, size_t> &symbols);
     typename Elf::SectionHeader* sec;
     ElfFile<Elf>* file;
   };
