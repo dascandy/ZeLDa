@@ -33,6 +33,7 @@ public:
     Unknown,
     Function,
     Object,
+    Section,
   };
   virtual Section* section() = 0;
   virtual size_t offset() = 0;
@@ -68,9 +69,10 @@ private:
     size_t SetAddress(size_t address) override;
     size_t GetAddress() override;
     std::string name() override;
-    void Write(uint8_t* target, const std::unordered_map<Section*, size_t> &symbols);
+    void Write(uint8_t* , const std::unordered_map<Section*, size_t> &);
     typename Elf::SectionHeader* sec;
     ElfFile<Elf>* file;
+    uint64_t addr;
   };
 
   struct ElfSymbol : Symbol {
@@ -101,19 +103,18 @@ public:
   const char* name(size_t offset);
   const char* symbolname(size_t offset);
 };
-/*
+
 template <typename Elf>
 class ElfExecutable {
 public:
   ElfExecutable(const std::string& name);
+  void addSegment(Section::OutputClass oclass, uint64_t vaddr, const uint8_t* data, size_t size);
   ~ElfExecutable();
-  typename Elf::ElfHeader* header();
-  typename Elf::ProgramHeader* add_phdr(size_t size, uint32_t vaddr, bool isBss);
-  uint8_t *get(typename Elf::ProgramHeader*);
 private:
-  std::vector<uint8_t> storage;
   std::vector<typename Elf::ProgramHeader> phdrs;
   std::string name;
+  size_t offset;
+  int fd;
 };
-*/
+
 

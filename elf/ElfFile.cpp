@@ -1,6 +1,9 @@
 #include "ElfFile.h"
 #include "elf.h"
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 ObjectFile* LoadElfFile(std::shared_ptr<MmapFile> file, size_t offset, size_t length) {
   ElfHeader* hdr = (ElfHeader*)(file->ptr + offset);
@@ -14,7 +17,7 @@ ObjectFile* LoadElfFile(std::shared_ptr<MmapFile> file, size_t offset, size_t le
 }
 
 template <typename Elf>
-ElfFile<Elf>::ElfFile(std::shared_ptr<MmapFile> file, size_t offset, size_t length) 
+ElfFile<Elf>::ElfFile(std::shared_ptr<MmapFile> file, size_t offset, size_t /*length*/) 
 : file(file)
 , ptr(file->ptr + offset)
 {
@@ -69,7 +72,7 @@ typename Elf::SectionHeader* ElfFile<Elf>::section(const std::string& name) {
       return section(index);
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 template <typename Elf>
@@ -123,14 +126,15 @@ typename Elf::Symbol* ElfFile<Elf>::symbol(const std::string& name) {
       return symbols + index;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 template <typename Elf>
 ElfFile<Elf>::ElfSymbol::ElfSymbol(typename Elf::Symbol* sym, ElfFile<Elf>* file) 
 : sym(sym)
 , file(file) 
-{}
+{
+}
 
 template <typename Elf>
 size_t ElfFile<Elf>::ElfSymbol::offset() {
@@ -149,6 +153,7 @@ Section* ElfFile<Elf>::ElfSymbol::section() {
 
 template <typename Elf>
 Symbol::Type ElfFile<Elf>::ElfSymbol::type() {
+  printf("%d %d\n", sym->shndx, sym->type());
   if (sym->shndx == SHN_UNDEF) 
     return Type::Unknown;
   switch (sym->type()) {
@@ -158,6 +163,8 @@ Symbol::Type ElfFile<Elf>::ElfSymbol::type() {
       return Type::Function;
     case STT_OBJECT: 
       return Type::Object;
+    case STT_SECTION:
+      return Type::Section;
   }
 }
 
@@ -196,15 +203,17 @@ std::string ElfFile<Elf>::ElfSection::name() {
 
 template <typename Elf>
 size_t ElfFile<Elf>::ElfSection::SetAddress(size_t address) {
-  size_t mask = sec->addralign - 1;
-  if (address & mask) address += sec->addralign - (address & mask);
-  sec->addr = address;
-  return sec->addr + sec->size;
+  if (sec->addralign) {
+    size_t mask = sec->addralign - 1;
+    if (address & mask) address = (address | mask) + 1;
+  }
+  addr = address;
+  return addr + sec->size;
 }
 
 template <typename Elf>
 size_t ElfFile<Elf>::ElfSection::GetAddress() {
-  return sec->addr;
+  return addr;
 }
 
 template <typename Elf>
@@ -225,82 +234,75 @@ size_t ElfFile<Elf>::ElfSection::size() {
 
 template <typename Elf>
 void ElfFile<Elf>::ElfSection::Write(uint8_t* target, const std::unordered_map<Section*, size_t> &sections) {
-  TODO:;
+  (void)target; (void)sections;
 }
 
-/*
 template <typename Elf>
-ElfExecutable<Elf>::ElfExecutable(const std::string& name) 
+ElfExecutable<Elf>::ElfExecutable(const std::string& name)
 : name(name)
+, offset(0x1000)
 {
-  // Large enough for now.
-  storage.reserve(1048576);
-  storage.resize(sizeof(typename Elf::ElfHeader));
-  typename Elf::ElfHeader* hdr = header();
-  // Required bits
-  hdr->ident = 0x464C457F;
-  hdr->filclass = Elf::Class;
-  hdr->data_encoding = ELFDATA2LSB;
-  hdr->file_version = EV_CURRENT;
-  memset(hdr->pad, 0, sizeof(hdr->pad));
-  hdr->type = ET_EXEC;
-  hdr->machine = EM_386;
-  hdr->version = EV_CURRENT;
-  hdr->phentsize = sizeof(typename Elf::ProgramHeader);
-  hdr->shentsize = sizeof(typename Elf::SectionHeader);
-  hdr->ehsize = sizeof(typename Elf::ElfHeader);
-  hdr->flags = 0;
-  hdr->shstrndx = SHN_UNDEF;
-  hdr->phoff = sizeof(typename Elf::ElfHeader);
-  hdr->shnum = 0;
-  hdr->shoff = 0;
-  hdr->phnum = 0;
-  hdr->entry = 0;
+  fd = open(name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
+  offset = 0x1000;
+  lseek(fd, offset, SEEK_SET);
+}
+
+template <typename Elf>
+void ElfExecutable<Elf>::addSegment(Section::OutputClass oclass, uint64_t vaddr, const uint8_t* data, size_t size) {
+  typename Elf::ProgramHeader hdr;
+
+  hdr.type = PT_LOAD;
+  hdr.offset = offset;
+  hdr.vaddr = vaddr;
+  hdr.paddr = 0;
+  hdr.filesz = oclass == Section::OutputClass::Bss ? 0 : size;
+  hdr.memsz = size;
+  switch(oclass) {
+    case Section::OutputClass::Code:   hdr.flags = PF_R | PF_X; break;
+    case Section::OutputClass::RoData: hdr.flags = PF_R; break;
+    case Section::OutputClass::Data:   hdr.flags = PF_R | PF_W; break;
+    case Section::OutputClass::Bss:    hdr.flags = PF_R | PF_W; break;
+  }
+  hdr.align = 0x1000; // because we do.
+  phdrs.push_back(hdr);
+
+  write(fd, data, size);
+  offset = ((offset + size - 1) | 0xFFF) + 1;
+  lseek(fd, offset, SEEK_SET);
 }
 
 template <typename Elf>
 ElfExecutable<Elf>::~ElfExecutable() {
-  // TODO: patch in phdrs
-  FILE* f = fopen(name.c_str(), "wb");
-  fwrite(storage.data(), storage.size(), 1, f);
-  fclose(f);
+  lseek(fd, 0, SEEK_SET);
+  {
+    typename Elf::ElfHeader hdr;
+    // Required bits
+    hdr.ident = 0x464C457F;
+    hdr.filclass = Elf::Class;
+    hdr.data_encoding = ELFDATA2LSB;
+    hdr.file_version = EV_CURRENT;
+    memset(hdr.pad, 0, sizeof(hdr.pad));
+    hdr.type = ET_EXEC;
+    hdr.machine = EM_X64;
+    hdr.version = EV_CURRENT;
+    hdr.phentsize = sizeof(typename Elf::ProgramHeader);
+    hdr.shentsize = sizeof(typename Elf::SectionHeader);
+    hdr.ehsize = sizeof(typename Elf::ElfHeader);
+    hdr.flags = 0;
+    hdr.shstrndx = SHN_UNDEF;
+    hdr.phoff = sizeof(typename Elf::ElfHeader);
+    hdr.shnum = 0;
+    hdr.shoff = 0;
+    hdr.phnum = phdrs.size();
+    hdr.entry = 0;
+    write(fd, &hdr, sizeof(hdr));
+  }
+  write(fd, phdrs.data(), phdrs.size() * sizeof(typename Elf::ProgramHeader));
+  close(fd);
 }
 
-template <typename Elf>
-typename Elf::ElfHeader* ElfExecutable<Elf>::header() {
-  return (typename Elf::ElfHeader*)storage.data();
-}
-
-template <typename Elf>
-uint8_t *ElfExecutable<Elf>::get(typename Elf::ProgramHeader* phdr) {
-  return storage.data() + phdr->offset;
-}
-
-template <typename Elf>
-typename Elf::ProgramHeader* ElfExecutable<Elf>::add_phdr(size_t size, uint32_t vaddr, bool isBss) {
-  size_t s = (((storage.size() - 1) | 0xFFF) + 1);
-  size_t offs = s;
-  s += size;
-  storage.resize(s);
-  typename Elf::ElfHeader* ehdr = header();
-  typename Elf::ProgramHeader* hdr = (typename Elf::ProgramHeader*)(storage.data() + ehdr->phoff) + ehdr->phnum;
-  ehdr->phnum++;
-
-  hdr->type = PT_LOAD;
-  hdr->offset = offs;
-  hdr->vaddr = vaddr;
-  hdr->paddr = 0;
-  hdr->filesz = size;
-  hdr->memsz = isBss ? 0 : size;
-  hdr->flags = 0;
-  hdr->align = 0x1000; // because we do.
-
-  return hdr;
-}
-
-template <> class ElfExecutable<Elf32>;
-template <> class ElfExecutable<Elf64>;
-*/
+template class ElfExecutable<Elf32>;
+template class ElfExecutable<Elf64>;
 template class ElfFile<Elf32>;
 template class ElfFile<Elf64>;
 

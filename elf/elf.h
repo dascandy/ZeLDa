@@ -67,6 +67,7 @@ enum {
 enum {
   EM_NONE = 0,
   EM_386 = 3,
+  EM_X64 = 0x3E,
 };
 
 enum {
@@ -87,6 +88,12 @@ enum {
   PT_NOTE = 4,
   PT_SHLIB = 5,
   PT_PHDR = 6,
+};
+
+enum {
+  PF_X = 1,
+  PF_W = 2,
+  PF_R = 4,
 };
 
 enum {
@@ -148,27 +155,27 @@ struct Elf64_Sym {
 struct Elf64_Rel {
   Elf64_Addr    offset;
   Elf64_Xword   info;
-  uint32_t      sym() { return info >> 8; }
-  uint8_t       type() { return info & 0xFF; }
+  uint32_t      sym() { return info >> 32; }
+  uint32_t      type() { return info & 0xFFFFFFF; }
 };
 
 struct Elf64_RelA {
   Elf64_Addr    offset;
   Elf64_Xword   info;
   Elf64_Sxword  addend;
-  uint32_t      sym() { return info >> 8; }
-  uint8_t       type() { return info & 0xFF; }
+  uint32_t      sym() { return info >> 32; }
+  uint32_t      type() { return info & 0xFFFFFFFF; }
 };
 
 struct Elf64_Phdr {
   Elf64_Word    type;
+  Elf64_Word    flags;
   Elf64_Off     offset;
   Elf64_Addr    vaddr;
   Elf64_Addr    paddr;
-  Elf64_Word    filesz;
-  Elf64_Word    memsz;
-  Elf64_Word    flags;
-  Elf64_Word    align;
+  Elf64_Xword    filesz;
+  Elf64_Xword    memsz;
+  Elf64_Xword    align;
 };
 
 struct Elf32_Ehdr {
