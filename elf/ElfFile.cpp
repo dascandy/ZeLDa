@@ -232,9 +232,30 @@ size_t ElfFile<Elf>::ElfSection::size() {
   return sec->size;
 }
 
+template <typename Rel, typename Elf>
+void PatchRelocations(ElfFile<Elf>* file, typename Elf::SectionHeader* sec, uint8_t target, const std::unordered_map<Section*, size_t> &sections) {
+  Relocation* relCurrent = reinterpret_cast<Relocation*>(file->get(rels));
+  Relocation* relEnd = relCurrent + rels->size / sizeof(Relocation);
+  for (; relCurrent != relEnd; ++relCurrent) {
+    Symbol* sym = file->getSymbol(relCurrent->sym())
+    uint64_t addr = sym->addr();
+    switch(relCurrent->type()) {
+    }
+    *(uint32_t*)(exe.get(phdr) + offset + r.offset) += addr;
+  }
+}
+
 template <typename Elf>
 void ElfFile<Elf>::ElfSection::Write(uint8_t* target, const std::unordered_map<Section*, size_t> &sections) {
-  (void)target; (void)sections;
+  memcpy(target, sec->data, sec->size);
+  typename Elf::SectionHeader* rels = file->section(".rel" + name());
+  if (rels) {
+    PatchRelocations<typename Elf::Relocation>(file, rels, target, sections);
+  }
+  typename Elf::SectionHeader* relas = file->section(".rela" + name());
+  if (relas) {
+    PatchRelocations<typename Elf::RelocationA>(file, relas, target, sections);
+  }
 }
 
 template <typename Elf>
