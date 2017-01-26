@@ -100,6 +100,14 @@ enum {
   R_386_NONE = 0,
   R_386_32 = 1,
   R_386_PC32 = 2,
+
+  R_X86_64_NONE = 0,
+  R_X86_64_64 = 1,
+  R_X86_64_PC32 = 2,
+  R_X86_64_PLT32 = 4,
+  R_X86_64_32 = 10,
+  R_X86_64_32S = 11,
+
 };
 
 
@@ -157,14 +165,16 @@ struct Elf64_Rel {
   Elf64_Xword   info;
   uint32_t      sym() { return info >> 32; }
   uint32_t      type() { return info & 0xFFFFFFF; }
+  int64_t       addend() { return 0; }
 };
 
 struct Elf64_RelA {
   Elf64_Addr    offset;
   Elf64_Xword   info;
-  Elf64_Sxword  addend;
+  Elf64_Sxword  addend_;
   uint32_t      sym() { return info >> 32; }
   uint32_t      type() { return info & 0xFFFFFFFF; }
+  int64_t       addend() { return addend_; }
 };
 
 struct Elf64_Phdr {
@@ -226,14 +236,16 @@ struct Elf32_Rel {
   Elf32_Word    info;
   uint32_t      sym() { return info >> 8; }
   uint8_t       type() { return info & 0xFF; }
+  int64_t       addend() { return 0; }
 };
 
 struct Elf32_RelA {
   Elf32_Addr    offset;
   Elf32_Word    info;
-  Elf32_Sword   addend;
+  Elf32_Sword   addend_;
   uint32_t      sym() { return info >> 8; }
   uint8_t       type() { return info & 0xFF; }
+  int64_t       addend() { return addend_; }
 };
 
 struct Elf32_Phdr {

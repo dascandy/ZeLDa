@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <assert.h>
 
 ObjectFile* LoadElfFile(std::shared_ptr<MmapFile> file, size_t offset, size_t length) {
   ElfHeader* hdr = (ElfHeader*)(file->ptr + offset);
@@ -232,29 +233,66 @@ size_t ElfFile<Elf>::ElfSection::size() {
   return sec->size;
 }
 
-template <typename Rel, typename Elf>
-void PatchRelocations(ElfFile<Elf>* file, typename Elf::SectionHeader* sec, uint8_t target, const std::unordered_map<Section*, size_t> &sections) {
-  Relocation* relCurrent = reinterpret_cast<Relocation*>(file->get(rels));
-  Relocation* relEnd = relCurrent + rels->size / sizeof(Relocation);
+template <typename Relocation, typename Elf>
+void PatchRelocations(uint64_t address, ElfFile<Elf>* file, typename Elf::SectionHeader* sec, uint8_t *target, const std::unordered_map<std::string, Symbol*> &symbols) {
+  Relocation* relCurrent = reinterpret_cast<Relocation*>(file->get(sec));
+  Relocation* relEnd = relCurrent + sec->size / sizeof(Relocation);
   for (; relCurrent != relEnd; ++relCurrent) {
-    Symbol* sym = file->getSymbol(relCurrent->sym())
-    uint64_t addr = sym->addr();
-    switch(relCurrent->type()) {
+    Symbol* sym = file->getSymbol(relCurrent->sym());
+    if (sym->type() == Symbol::Type::Unknown) { // The relocation is either against a local symbol, or a named remote symbol. If it's not local, look up by name.
+      sym = symbols.find(sym->name())->second;
     }
-    *(uint32_t*)(exe.get(phdr) + offset + r.offset) += addr;
+    assert(sym != nullptr);
+    uint64_t S = sym->section()->GetAddress() + sym->offset();
+    uint64_t A = relCurrent->addend();
+    uint64_t P = address + relCurrent->offset;
+    uint64_t out;
+    int writesize;
+    switch(relCurrent->type()) {
+    case R_X86_64_64:
+      printf("64_64\n");
+      assert(false);
+      break;
+    case R_X86_64_32:
+      printf("64_32\n");
+      assert(false);
+      break;
+    case R_X86_64_32S:
+      printf("64_32S\n");
+      assert(false);
+      break;
+    case R_X86_64_PC32:
+    case R_X86_64_PLT32:
+      printf("64_PC32\n");
+      writesize = 32;
+      out = S + A - P;
+      break;
+    default:
+      printf("unknown relocation: %d\n", relCurrent->type());
+      assert(false);
+      break;
+    }
+
+    switch(writesize) {
+    case 32:
+      *(uint32_t*)(target + relCurrent->offset) += (uint32_t)out;
+      break;
+    default:
+      assert(false);
+    }
   }
 }
 
 template <typename Elf>
-void ElfFile<Elf>::ElfSection::Write(uint8_t* target, const std::unordered_map<Section*, size_t> &sections) {
-  memcpy(target, sec->data, sec->size);
+void ElfFile<Elf>::ElfSection::Write(uint8_t* target, const std::unordered_map<std::string, Symbol*> &symbols) {
+  memcpy(target, file->get(sec), sec->size);
   typename Elf::SectionHeader* rels = file->section(".rel" + name());
   if (rels) {
-    PatchRelocations<typename Elf::Relocation>(file, rels, target, sections);
+    PatchRelocations<typename Elf::Relocation>(GetAddress(), file, rels, target, symbols);
   }
   typename Elf::SectionHeader* relas = file->section(".rela" + name());
   if (relas) {
-    PatchRelocations<typename Elf::RelocationA>(file, relas, target, sections);
+    PatchRelocations<typename Elf::RelocationA>(GetAddress(), file, relas, target, symbols);
   }
 }
 
@@ -262,6 +300,7 @@ template <typename Elf>
 ElfExecutable<Elf>::ElfExecutable(const std::string& name)
 : name(name)
 , offset(0x1000)
+, entry(NULL)
 {
   fd = open(name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
   offset = 0x1000;
@@ -315,11 +354,16 @@ ElfExecutable<Elf>::~ElfExecutable() {
     hdr.shnum = 0;
     hdr.shoff = 0;
     hdr.phnum = phdrs.size();
-    hdr.entry = 0;
+    hdr.entry = entry->section()->GetAddress() + entry->offset();
     write(fd, &hdr, sizeof(hdr));
   }
   write(fd, phdrs.data(), phdrs.size() * sizeof(typename Elf::ProgramHeader));
   close(fd);
+}
+
+template <typename Elf>
+void ElfExecutable<Elf>::SetEntry(Symbol* sym) {
+  entry = sym;
 }
 
 template class ElfExecutable<Elf32>;

@@ -24,7 +24,7 @@ public:
   virtual size_t size() = 0;
   virtual size_t SetAddress(size_t address) = 0;
   virtual size_t GetAddress() = 0;
-  virtual void Write(uint8_t* target, const std::unordered_map<Section*, size_t> &symbols) = 0;
+  virtual void Write(uint8_t* target, const std::unordered_map<std::string, Symbol*> &symbols) = 0;
 };
 
 class Symbol {
@@ -69,7 +69,7 @@ private:
     size_t SetAddress(size_t address) override;
     size_t GetAddress() override;
     std::string name() override;
-    void Write(uint8_t* , const std::unordered_map<Section*, size_t> &);
+    void Write(uint8_t*, const std::unordered_map<std::string, Symbol*> &symbols) override;
     typename Elf::SectionHeader* sec;
     ElfFile<Elf>* file;
     uint64_t addr;
@@ -109,12 +109,14 @@ class ElfExecutable {
 public:
   ElfExecutable(const std::string& name);
   void addSegment(Section::OutputClass oclass, uint64_t vaddr, const uint8_t* data, size_t size);
+  void SetEntry(Symbol* sym);
   ~ElfExecutable();
 private:
   std::vector<typename Elf::ProgramHeader> phdrs;
   std::string name;
   size_t offset;
   int fd;
+  Symbol* entry;
 };
 
 
