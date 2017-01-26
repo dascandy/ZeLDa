@@ -1,11 +1,13 @@
 project(zelda)
 
 add_executable(zelda 
-  main.cpp
+  src/main.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
-  elf
+  PRIVATE
+    elf
+    file
 )
 
 
